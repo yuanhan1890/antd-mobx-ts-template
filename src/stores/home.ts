@@ -1,5 +1,5 @@
 import { action, observable } from "mobx";
-import { Store } from './storeMeta';
+import { Store } from "./storeMeta";
 
 import { getCityInfo } from "@/api";
 import get from "@/utils/get";
@@ -27,15 +27,15 @@ export class HomeStore extends Store {
     }
 
     // this.autorun(flow(gen));
-    this.takeLatest(this, () => { return this.showText }, function* changeText(context: HomeStore) {
-      if (context.showText) {
-        context.text = yield new Promise((r) => {
+    this.takeLatest(async (commit) => {
+      if (this.showText) {
+        this.text = await new Promise((r) => {
           setTimeout(() => {
             r("true" + Date.now());
           }, 2000);
         });
       } else {
-        context.text = yield new Promise((r) => {
+        this.text = await new Promise((r) => {
           setTimeout(() => {
             r("false" + Date.now());
           }, 4000);

@@ -1,35 +1,35 @@
-import { autorun, flow, IAutorunOptions, IReactionPublic, reaction } from "mobx";
-import { CancellablePromise } from "mobx/lib/api/flow";
+import { autorun, IAutorunOptions, IReactionPublic } from "mobx";
 
-export function takeLatest<T, R>(
-  context: T,
-  expression: (r: IReactionPublic) => R,
-  generator: (context: T, args: R) => Generator<any, any, any> | AsyncGenerator<any, any, any>,
+const ERROR_MSG = "AUTORUN_ABORT_ERROR";
+
+let id = 0;
+
+export function takeLatest(
+  fn: (commit: (committer: any) => void, reaction: IReactionPublic) => void,
+  opts?: IAutorunOptions | undefined,
 ) {
-  const gen = flow(generator);
-  let canceled = null as CancellablePromise<any> | null;
-  const dispose = reaction(expression, (args) => {
-    if (canceled !== null) {
-      canceled.cancel();
-      canceled = null;
-    }
-    canceled = gen(context, args);
-
-    canceled.catch((ex) => {
-      if (ex.message !== "FLOW_CANCELLED") {
-        throw ex;
+  const wrapper = (reaction: IReactionPublic) => {
+    const currentId = ++id;
+    function commit(committer: any) {
+      if (currentId !== id) {
+        throw new Error(ERROR_MSG);
+      } else {
+        committer();
       }
-    });
-  }, { fireImmediately: true});
+    }
+
+    try {
+      fn(commit, reaction);
+    } catch (ex) {
+      if (ex.message === ERROR_MSG) {
+        return;
+      }
+      throw ex;
+    }
+  };
 
   return {
-    dispose() {
-      if (canceled) {
-          canceled.cancel();
-          canceled = null;
-      }
-      dispose();
-    },
+    dispose: autorun(wrapper, opts),
   };
 }
 
@@ -39,7 +39,7 @@ export interface IDisposable {
 
 export abstract class Store {
   disposables: IDisposable[] = [];
-  stores: Array<Store> = [];
+  stores: Store[] = [];
 
   init() {
     this.stores.forEach((store) => {
@@ -53,12 +53,8 @@ export abstract class Store {
     });
   }
 
-  takeLatest = <T, R>(
-    context: T,
-    expression: (r: IReactionPublic) => R,
-    generator: (context: T, args: R) => Generator<any, any, any>,
-  ) => {
-    this.disposables.push(takeLatest(context, expression, generator));
+  takeLatest = (fn: (committer: any, reaction: IReactionPublic) => void, opts?: IAutorunOptions | undefined) => {
+    this.disposables.push(takeLatest(fn, opts));
   }
 
   disposeFn = (fn: () => void) => {
