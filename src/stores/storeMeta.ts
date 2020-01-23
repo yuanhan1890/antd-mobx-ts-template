@@ -2,12 +2,12 @@ import { autorun, IAutorunOptions, IReactionPublic } from "mobx";
 
 const ERROR_MSG = "AUTORUN_ABORT_ERROR";
 
-let id = 0;
-
 export function takeLatest(
   fn: (commit: (committer: any) => void, reaction: IReactionPublic) => void,
   opts?: IAutorunOptions | undefined,
 ) {
+  let id = 0;
+
   const wrapper = (reaction: IReactionPublic) => {
     const currentId = ++id;
     function commit(committer: any) {
